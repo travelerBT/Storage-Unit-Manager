@@ -12,7 +12,9 @@ service cloud.firestore {
     }
 
     function role() {
-      return claims().role;
+      return request.auth.token.role != null
+        ? request.auth.token.role
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isSuperAdmin() {
@@ -58,7 +60,7 @@ service cloud.firestore {
       allow read: if isSuperAdmin()
                   || ownsBusinessId(businessId)
                   || (isManager() && claims().businessId == businessId);
-      allow create: if isSuperAdmin();
+      allow create: if isSuperAdmin() || isBusinessOwner();
       allow update: if isSuperAdmin() || ownsBusinessId(businessId);
       allow delete: if isSuperAdmin();
     }

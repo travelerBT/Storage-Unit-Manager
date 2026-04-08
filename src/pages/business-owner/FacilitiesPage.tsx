@@ -65,7 +65,10 @@ export function FacilitiesPage() {
       setOpen(false)
       reset()
     },
-    onError: () => toast.error('Failed to create facility'),
+    onError: (err) => {
+      console.error('Failed to create facility:', err)
+      toast.error('Failed to create facility')
+    },
   })
 
   return (

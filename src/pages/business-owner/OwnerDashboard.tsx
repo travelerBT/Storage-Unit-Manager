@@ -1,15 +1,110 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { useAuth } from '@/contexts/AuthContext'
-import { facilityService } from '@/lib/services'
+import { facilityService, businessService } from '@/lib/services'
 import { StatCard } from '@/components/shared/StatCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import { Building2, Warehouse, Users, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
+import { db } from '@/lib/firebase'
+
+const setupSchema = z.object({
+  name:    z.string().min(1, 'Business name is required'),
+  email:   z.string().email('Enter a valid email').optional().or(z.literal('')),
+  phone:   z.string().optional(),
+  address: z.string().optional(),
+})
+type SetupValues = z.infer<typeof setupSchema>
+
+function BusinessSetup() {
+  const { firebaseUser, refreshClaims } = useAuth()
+  const qc = useQueryClient()
+
+  const { register, handleSubmit, formState: { errors } } = useForm<SetupValues>({
+    resolver: zodResolver(setupSchema),
+  })
+
+  const setup = useMutation({
+    mutationFn: async (data: SetupValues) => {
+      // 1. Create the business doc
+      const businessId = await businessService.create({
+        name: data.name,
+        email: data.email ?? '',
+        phone: data.phone ?? '',
+        address: data.address ?? '',
+        ownerId: firebaseUser!.uid,
+        subscriptionStatus: 'trial',
+      })
+      // 2. Link businessId to the user doc
+      await updateDoc(doc(db, 'users', firebaseUser!.uid), {
+        businessId,
+        updatedAt: serverTimestamp(),
+      })
+      return businessId
+    },
+    onSuccess: async () => {
+      await refreshClaims()
+      await qc.invalidateQueries({ queryKey: ['facilities'] })
+      toast.success('Business created!')
+    },
+    onError: (err) => {
+      console.error('Failed to create business:', err)
+      toast.error('Failed to create business')
+    },
+  })
+
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Set up your business
+          </CardTitle>
+          <p className="text-muted-foreground text-sm">Create your business profile to get started.</p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit((d) => setup.mutate(d))} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Business Name *</Label>
+              <Input placeholder="Acme Storage Co." {...register('name')} />
+              {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" placeholder="info@yourbusiness.com" {...register('email')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input placeholder="(555) 000-0000" {...register('phone')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Address</Label>
+              <Input placeholder="123 Main St, City, State" {...register('address')} />
+            </div>
+            <Button type="submit" className="w-full" disabled={setup.isPending}>
+              {setup.isPending ? 'Creating…' : 'Create Business'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 export function OwnerDashboard() {
   const { appUser } = useAuth()
+
+  // Show setup screen if businessId isn't linked yet
+  if (!appUser?.businessId) return <BusinessSetup />
 
   const { data: facilities = [] } = useQuery({
     queryKey: ['facilities', appUser?.businessId],
