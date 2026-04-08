@@ -1,0 +1,184 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function claims() {
+      return request.auth.token;
+    }
+
+    function role() {
+      return claims().role;
+    }
+
+    function isSuperAdmin() {
+      return isAuth() && role() == 'super_admin';
+    }
+
+    function isBusinessOwner() {
+      return isAuth() && role() == 'business_owner';
+    }
+
+    function isManager() {
+      return isAuth() && role() == 'manager';
+    }
+
+    function isTenant() {
+      return isAuth() && role() == 'tenant';
+    }
+
+    function ownsBusinessId(bId) {
+      return isBusinessOwner() && claims().businessId == bId;
+    }
+
+    function managesFacility(fId) {
+      return isManager() && fId in claims().facilityIds;
+    }
+
+    function isSelf(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isSuperAdmin()
+                  || (isBusinessOwner() && claims().businessId == resource.data.businessId)
+                  || (isManager() && resource.data.facilityIds.hasAny(claims().facilityIds));
+      allow create: if isSelf(userId);
+      allow update: if isSelf(userId) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Businesses ─────────────────────────────────────────────────────────
+    match /businesses/{businessId} {
+      allow read: if isSuperAdmin()
+                  || ownsBusinessId(businessId)
+                  || (isManager() && claims().businessId == businessId);
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin() || ownsBusinessId(businessId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Facilities ─────────────────────────────────────────────────────────
+    match /facilities/{facilityId} {
+      allow read: if isSuperAdmin()
+                  || ownsBusinessId(resource.data.businessId)
+                  || managesFacility(facilityId)
+                  || (isTenant() && claims().facilityId == facilityId);
+      allow create: if isSuperAdmin() || isBusinessOwner();
+      allow update: if isSuperAdmin()
+                    || ownsBusinessId(resource.data.businessId)
+                    || managesFacility(facilityId);
+      allow delete: if isSuperAdmin() || ownsBusinessId(resource.data.businessId);
+    }
+
+    // ── Units ──────────────────────────────────────────────────────────────
+    match /units/{unitId} {
+      allow read: if isSuperAdmin()
+                  || ownsBusinessId(resource.data.businessId)
+                  || managesFacility(resource.data.facilityId)
+                  || (isTenant() && resource.data.currentTenantId == request.auth.uid);
+      allow create: if isSuperAdmin()
+                    || ownsBusinessId(request.resource.data.businessId)
+                    || managesFacility(request.resource.data.facilityId);
+      allow update: if isSuperAdmin()
+                    || ownsBusinessId(resource.data.businessId)
+                    || managesFacility(resource.data.facilityId);
+      allow delete: if isSuperAdmin() || ownsBusinessId(resource.data.businessId);
+    }
+
+    // ── Tenants ────────────────────────────────────────────────────────────
+    match /tenants/{tenantId} {
+      allow read: if isSuperAdmin()
+                  || ownsBusinessId(resource.data.businessId)
+                  || managesFacility(resource.data.facilityId)
+                  || isSelf(tenantId);
+      allow create: if isSuperAdmin()
+                    || ownsBusinessId(request.resource.data.businessId)
+                    || managesFacility(request.resource.data.facilityId);
+      allow update: if isSuperAdmin()
+                    || ownsBusinessId(resource.data.businessId)
+                    || managesFacility(resource.data.facilityId)
+                    || isSelf(tenantId);
+      allow delete: if isSuperAdmin() || ownsBusinessId(resource.data.businessId);
+    }
+
+    // ── Leases ─────────────────────────────────────────────────────────────
+    match /leases/{leaseId} {
+      allow read: if isSuperAdmin()
+                  || ownsBusinessId(resource.data.businessId)
+                  || managesFacility(resource.data.facilityId)
+                  || (isTenant() && resource.data.tenantId == request.auth.uid);
+      allow create: if isSuperAdmin()
+                    || ownsBusinessId(request.resource.data.businessId)
+                    || managesFacility(request.resource.data.facilityId);
+      // Tenants may sign (set signatureAcknowledged=true, signedAt) but not modify terms
+      allow update: if isSuperAdmin()
+                    || managesFacility(resource.data.facilityId)
+                    || (isTenant() && resource.data.tenantId == request.auth.uid
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['tenantSignatureAcknowledged', 'signedAt', 'updatedAt']));
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Invoices ───────────────────────────────────────────────────────────
+    match /invoices/{invoiceId} {
+      allow read: if isSuperAdmin()
+                  || ownsBusinessId(resource.data.businessId)
+                  || managesFacility(resource.data.facilityId)
+                  || (isTenant() && resource.data.tenantId == request.auth.uid);
+      allow create: if isSuperAdmin()
+                    || ownsBusinessId(request.resource.data.businessId)
+                    || managesFacility(request.resource.data.facilityId);
+      allow update: if isSuperAdmin()
+                    || managesFacility(resource.data.facilityId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Maintenance Requests ───────────────────────────────────────────────
+    match /maintenanceRequests/{requestId} {
+      allow read: if isSuperAdmin()
+                  || ownsBusinessId(resource.data.businessId)
+                  || managesFacility(resource.data.facilityId)
+                  || (isTenant() && resource.data.submittedBy == request.auth.uid);
+      allow create: if isAuth()
+                    && (managesFacility(request.resource.data.facilityId)
+                        || (isTenant() && request.resource.data.submittedBy == request.auth.uid));
+      allow update: if isSuperAdmin() || managesFacility(resource.data.facilityId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Auctions ───────────────────────────────────────────────────────────
+    match /auctions/{auctionId} {
+      allow read: if isSuperAdmin()
+                  || ownsBusinessId(resource.data.businessId)
+                  || managesFacility(resource.data.facilityId);
+      allow create, update: if isSuperAdmin()
+                              || managesFacility(resource.data.facilityId)
+                              || (isAuth() && managesFacility(request.resource.data.facilityId));
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Notifications ──────────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if isSuperAdmin()
+                  || managesFacility(resource.data.facilityId)
+                  || (isAuth() && resource.data.recipientId == request.auth.uid);
+      allow create: if isSuperAdmin() || managesFacility(request.resource.data.facilityId);
+      allow update: if isSuperAdmin() || managesFacility(resource.data.facilityId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Invites ────────────────────────────────────────────────────────────
+    match /invites/{token} {
+      allow read: if true; // token-gated; validated server-side
+      allow create: if isSuperAdmin() || isBusinessOwner() || isManager();
+      allow update: if isAuth(); // mark as used
+      allow delete: if isSuperAdmin();
+    }
+  }
+}
