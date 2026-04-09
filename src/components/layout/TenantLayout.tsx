@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard',  href: '/tenant',            icon: LayoutDashboard },
+  { label: 'Dashboard', exact: true,  href: '/tenant',            icon: LayoutDashboard },
   { label: 'My Unit',    href: '/tenant/unit',       icon: WarehouseIcon },
   { label: 'Invoices',   href: '/tenant/invoices',   icon: FileText },
   { label: 'Maintenance',href: '/tenant/maintenance',icon: Wrench },

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard',  href: '/admin',            icon: LayoutDashboard },
+  { label: 'Dashboard',  href: '/admin',            icon: LayoutDashboard, exact: true },
   { label: 'Businesses', href: '/admin/businesses', icon: Building2 },
   { label: 'Users',      href: '/admin/users',      icon: Users },
   { label: 'Settings',   href: '/admin/settings',   icon: Settings },

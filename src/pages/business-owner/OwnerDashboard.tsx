@@ -3,9 +3,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { useAuth } from '@/contexts/AuthContext'
-import { facilityService, businessService } from '@/lib/services'
+import { facilityService } from '@/lib/services'
+import { callFunction } from '@/lib/firebase'
 import { StatCard } from '@/components/shared/StatCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Building2, Warehouse, Users, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { db } from '@/lib/firebase'
 
 const setupSchema = z.object({
   name:    z.string().min(1, 'Business name is required'),
@@ -25,7 +24,7 @@ const setupSchema = z.object({
 type SetupValues = z.infer<typeof setupSchema>
 
 function BusinessSetup() {
-  const { firebaseUser, refreshClaims } = useAuth()
+  const { refreshClaims } = useAuth()
   const qc = useQueryClient()
 
   const { register, handleSubmit, formState: { errors } } = useForm<SetupValues>({
@@ -34,21 +33,17 @@ function BusinessSetup() {
 
   const setup = useMutation({
     mutationFn: async (data: SetupValues) => {
-      // 1. Create the business doc
-      const businessId = await businessService.create({
+      const setupBusiness = callFunction<
+        { name: string; email: string; phone: string; address: string },
+        { businessId: string }
+      >('setupBusiness')
+      const result = await setupBusiness({
         name: data.name,
         email: data.email ?? '',
         phone: data.phone ?? '',
         address: data.address ?? '',
-        ownerId: firebaseUser!.uid,
-        subscriptionStatus: 'trial',
       })
-      // 2. Link businessId to the user doc
-      await updateDoc(doc(db, 'users', firebaseUser!.uid), {
-        businessId,
-        updatedAt: serverTimestamp(),
-      })
-      return businessId
+      return result.data.businessId
     },
     onSuccess: async () => {
       await refreshClaims()
@@ -103,14 +98,14 @@ function BusinessSetup() {
 export function OwnerDashboard() {
   const { appUser } = useAuth()
 
-  // Show setup screen if businessId isn't linked yet
-  if (!appUser?.businessId) return <BusinessSetup />
-
   const { data: facilities = [] } = useQuery({
     queryKey: ['facilities', appUser?.businessId],
     queryFn: () => facilityService.listByBusiness(appUser!.businessId!),
     enabled: !!appUser?.businessId,
   })
+
+  // Show setup screen if businessId isn't linked yet
+  if (!appUser?.businessId) return <BusinessSetup />
 
   const totalUnits    = facilities.reduce((s, f) => s + f.totalUnits, 0)
   const totalOccupied = facilities.reduce((s, f) => s + f.occupiedUnits, 0)

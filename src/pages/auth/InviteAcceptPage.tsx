@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Warehouse } from 'lucide-react'
+import type { UserRole } from '@/types'
 
 const schema = z.object({
   displayName: z.string().min(2, 'Full name is required'),
@@ -27,6 +28,9 @@ export function InviteAcceptPage() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
   const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<UserRole>('tenant')
+  const [inviteBusinessId, setInviteBusinessId] = useState<string | undefined>()
+  const [inviteFacilityIds, setInviteFacilityIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
   const { signUp, refreshClaims } = useAuth()
@@ -50,7 +54,11 @@ export function InviteAcceptPage() {
           void navigate('/login')
           return
         }
-        setInviteEmail(snap.data().email as string)
+        const data = snap.data()
+        setInviteEmail(data.email as string)
+        setInviteRole((data.role as UserRole) ?? 'tenant')
+        setInviteBusinessId(data.businessId as string | undefined)
+        setInviteFacilityIds((data.facilityIds as string[]) ?? [])
       } catch {
         toast.error('Could not validate invite. Please contact your administrator.')
         void navigate('/login')
@@ -65,6 +73,26 @@ export function InviteAcceptPage() {
     setLoading(true)
     try {
       await signUp(inviteEmail, password, displayName)
+
+      // Promote the user doc to the correct role so Firestore rules work immediately.
+      // JWT claims are updated on next sign-in by the cloud function.
+      const { auth: firebaseAuth } = await import('@/lib/firebase')
+      const uid = firebaseAuth.currentUser?.uid
+      if (uid && (inviteRole !== 'tenant' || inviteBusinessId)) {
+        const updates: Record<string, unknown> = {
+          role: inviteRole,
+          updatedAt: serverTimestamp(),
+        }
+        if (inviteBusinessId) updates.businessId = inviteBusinessId
+        if (inviteFacilityIds.length) updates.facilityIds = inviteFacilityIds
+        await updateDoc(doc(db, 'users', uid), updates)
+      }
+
+      // Mark invite used
+      if (token) {
+        await updateDoc(doc(db, 'invites', token), { used: true })
+      }
+
       await refreshClaims()
       toast.success('Account created! Welcome to StorageOS.')
     } catch {

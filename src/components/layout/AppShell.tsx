@@ -26,11 +26,19 @@ const ROLE_LABELS: Record<UserRole, string> = {
   tenant: 'Tenant',
 }
 
+const ROLE_COLORS: Record<UserRole, string> = {
+  super_admin:    'bg-violet-600',
+  business_owner: 'bg-blue-600',
+  manager:        'bg-emerald-600',
+  tenant:         'bg-orange-500',
+}
+
 export interface NavItem {
   label: string
   href: string
   icon: LucideIcon
   badge?: string | number
+  exact?: boolean
 }
 
 interface AppShellProps {
@@ -48,6 +56,9 @@ function SidebarContent({
   accentColor = 'bg-primary',
 }: Pick<AppShellProps, 'navItems' | 'title' | 'roleLabel' | 'accentColor'>) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { roles, role, switchRole } = useAuth()
+  const otherRoles = roles.filter((r) => r !== role)
 
   return (
     <div className="flex h-full flex-col">
@@ -67,7 +78,7 @@ function SidebarContent({
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
-          const active = location.pathname.startsWith(item.href)
+          const active = item.exact ? location.pathname === item.href : (location.pathname === item.href || location.pathname.startsWith(item.href + '/'))
           return (
             <Link
               key={item.href}
@@ -93,6 +104,27 @@ function SidebarContent({
           )
         })}
       </nav>
+
+      {/* Role switcher — only shown when user has multiple roles */}
+      {otherRoles.length > 0 && (
+        <>
+          <Separator />
+          <div className="px-3 py-3 space-y-1">
+            <p className="px-3 text-xs font-medium text-muted-foreground mb-1">Switch role</p>
+            {otherRoles.map((r) => (
+              <button
+                key={r}
+                onClick={() => { switchRole(r); void navigate(roleHomePath(r)) }}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <span className={cn('h-2 w-2 rounded-full shrink-0', ROLE_COLORS[r])} />
+                {ROLE_LABELS[r]}
+                <ArrowLeftRight className="ml-auto h-3.5 w-3.5 opacity-60" />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -103,7 +135,7 @@ export function AppShell({ children, navItems, title, roleLabel, accentColor }: 
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
 
-  const currentPage = navItems.find((n) => location.pathname.startsWith(n.href))
+  const currentPage = navItems.find((n) => n.exact ? location.pathname === n.href : (location.pathname === n.href || location.pathname.startsWith(n.href + '/')))
 
   const initials = appUser?.displayName
     ?.split(' ')

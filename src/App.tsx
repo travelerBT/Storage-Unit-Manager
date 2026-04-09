@@ -25,10 +25,16 @@ import { BusinessesPage } from '@/pages/super-admin/BusinessesPage'
 import { AdminUsersPage } from '@/pages/super-admin/AdminUsersPage'
 
 // Business Owner pages
-import { OwnerDashboard }   from '@/pages/business-owner/OwnerDashboard'
-import { FacilitiesPage }   from '@/pages/business-owner/FacilitiesPage'
-import { ManagersPage }     from '@/pages/business-owner/ManagersPage'
-import { SubscriptionPage } from '@/pages/business-owner/SubscriptionPage'
+import { OwnerDashboard }       from '@/pages/business-owner/OwnerDashboard'
+import { FacilitiesPage }       from '@/pages/business-owner/FacilitiesPage'
+import { FacilityDetailPage }   from '@/pages/business-owner/FacilityDetailPage'
+import { FloorPlanSetupPage }   from '@/pages/business-owner/FloorPlanSetupPage'
+import { OwnerUnitDetailPage }  from '@/pages/business-owner/UnitDetailPage'
+import { ManagersPage }         from '@/pages/business-owner/ManagersPage'
+import { OwnerTenantsPage }     from '@/pages/business-owner/OwnerTenantsPage'
+import { OwnerTenantDetailPage } from '@/pages/business-owner/OwnerTenantDetailPage'
+import { OwnerManagerDetailPage } from '@/pages/business-owner/OwnerManagerDetailPage'
+import { SubscriptionPage }     from '@/pages/business-owner/SubscriptionPage'
 
 // Manager pages
 import { ManagerDashboard }      from '@/pages/manager/ManagerDashboard'
@@ -76,8 +82,14 @@ export default function App() {
 
             {/* Business Owner */}
             <Route path="/owner"              element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><OwnerDashboard /></OwnerLayout></RequireAuth>} />
-            <Route path="/owner/facilities"   element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><FacilitiesPage /></OwnerLayout></RequireAuth>} />
-            <Route path="/owner/managers"     element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><ManagersPage /></OwnerLayout></RequireAuth>} />
+            <Route path="/owner/facilities"            element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><FacilitiesPage /></OwnerLayout></RequireAuth>} />
+            <Route path="/owner/facilities/:facilityId" element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><FacilityDetailPage /></OwnerLayout></RequireAuth>} />
+            <Route path="/owner/facilities/:facilityId/setup-units" element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><FloorPlanSetupPage /></OwnerLayout></RequireAuth>} />
+            <Route path="/owner/facilities/:facilityId/units/:unitId" element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><OwnerUnitDetailPage /></OwnerLayout></RequireAuth>} />
+            <Route path="/owner/tenants"            element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><OwnerTenantsPage /></OwnerLayout></RequireAuth>} />
+            <Route path="/owner/tenants/:tenantId"  element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><OwnerTenantDetailPage /></OwnerLayout></RequireAuth>} />
+            <Route path="/owner/managers"              element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><ManagersPage /></OwnerLayout></RequireAuth>} />
+            <Route path="/owner/managers/:managerId"   element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><OwnerManagerDetailPage /></OwnerLayout></RequireAuth>} />
             <Route path="/owner/subscription" element={<RequireAuth allowedRoles={['business_owner']}><OwnerLayout><SubscriptionPage /></OwnerLayout></RequireAuth>} />
 
             {/* Manager — wrapped in FacilityProvider */}

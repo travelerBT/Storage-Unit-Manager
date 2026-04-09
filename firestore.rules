@@ -45,6 +45,11 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    function ownsThisFacility(facilityId) {
+      return isBusinessOwner() &&
+        get(/databases/$(database)/documents/facilities/$(facilityId)).data.businessId == claims().businessId;
+    }
+
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isSelf(userId) || isSuperAdmin()
@@ -82,6 +87,7 @@ service cloud.firestore {
     match /units/{unitId} {
       allow read: if isSuperAdmin()
                   || ownsBusinessId(resource.data.businessId)
+                  || ownsThisFacility(resource.data.facilityId)
                   || managesFacility(resource.data.facilityId)
                   || (isTenant() && resource.data.currentTenantId == request.auth.uid);
       allow create: if isSuperAdmin()
@@ -89,8 +95,11 @@ service cloud.firestore {
                     || managesFacility(request.resource.data.facilityId);
       allow update: if isSuperAdmin()
                     || ownsBusinessId(resource.data.businessId)
+                    || ownsThisFacility(resource.data.facilityId)
                     || managesFacility(resource.data.facilityId);
-      allow delete: if isSuperAdmin() || ownsBusinessId(resource.data.businessId);
+      allow delete: if isSuperAdmin()
+                    || ownsBusinessId(resource.data.businessId)
+                    || ownsThisFacility(resource.data.facilityId);
     }
 
     // ── Tenants ────────────────────────────────────────────────────────────

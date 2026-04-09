@@ -11,6 +11,7 @@ import {
   where,
   orderBy,
   serverTimestamp,
+  writeBatch,
   type QueryConstraint,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -108,6 +109,8 @@ export const tenantService = {
   getById: (id: string) => getOne<Tenant>(`tenants/${id}`),
   listByFacility: (facilityId: string) =>
     getMany<Tenant>('tenants', where('facilityId', '==', facilityId), orderBy('createdAt', 'desc')),
+  listByBusiness: (businessId: string) =>
+    getMany<Tenant>('tenants', where('businessId', '==', businessId), orderBy('createdAt', 'desc')),
   listByUser: (userId: string) =>
     getMany<Tenant>('tenants', where('userId', '==', userId)),
   create: async (id: string, data: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -151,6 +154,8 @@ export const invoiceService = {
     getMany<Invoice>('invoices', where('facilityId', '==', facilityId), orderBy('dueDate', 'desc')),
   listByTenant: (tenantId: string) =>
     getMany<Invoice>('invoices', where('tenantId', '==', tenantId), orderBy('dueDate', 'desc')),
+  listByUnit: (unitId: string) =>
+    getMany<Invoice>('invoices', where('unitId', '==', unitId), orderBy('dueDate', 'desc')),
   create: async (data: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => {
     const ref = await addDoc(collection(db, 'invoices'), {
       ...data,
@@ -217,4 +222,35 @@ export const notificationService = {
   },
   update: (id: string, data: Partial<Notification>) =>
     updateDoc(doc(db, 'notifications', id), data),
+}
+
+// ─── Cascade: delete a facility and all its related data ─────────────────────
+
+const BATCH_SIZE = 400 // Firestore batch limit is 500
+
+async function deleteQueryInBatches(col: string, ...constraints: QueryConstraint[]) {
+  const q = query(collection(db, col), ...constraints)
+  const snap = await getDocs(q)
+  if (snap.empty) return
+  // Split into chunks to stay under Firestore 500-op batch limit
+  const ids = snap.docs.map((d) => d.ref)
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db)
+    ids.slice(i, i + BATCH_SIZE).forEach((ref) => batch.delete(ref))
+    await batch.commit()
+  }
+}
+
+export async function deleteFacilityCascade(facilityId: string) {
+  const collections: [string, ...QueryConstraint[]][] = [
+    ['units',               where('facilityId', '==', facilityId)],
+    ['tenants',             where('facilityId', '==', facilityId)],
+    ['leases',              where('facilityId', '==', facilityId)],
+    ['invoices',            where('facilityId', '==', facilityId)],
+    ['maintenanceRequests', where('facilityId', '==', facilityId)],
+    ['auctions',            where('facilityId', '==', facilityId)],
+    ['notifications',       where('facilityId', '==', facilityId)],
+  ]
+  await Promise.all(collections.map(([col, ...c]) => deleteQueryInBatches(col, ...c)))
+  await deleteDoc(doc(db, 'facilities', facilityId))
 }

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard',    href: '/manager',               icon: LayoutDashboard },
+  { label: 'Dashboard',    href: '/manager',               icon: LayoutDashboard, exact: true },
   { label: 'Units',        href: '/manager/units',         icon: WarehouseIcon },
   { label: 'Tenants',      href: '/manager/tenants',       icon: Users },
   { label: 'Invoices',     href: '/manager/invoices',      icon: FileText },
