@@ -65,7 +65,7 @@ function SidebarContent({
       {/* Logo / brand */}
       <div className="flex items-center gap-3 px-6 py-5">
         <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg text-white text-sm font-bold', accentColor)}>
-          SU
+          SS
         </div>
         <div>
           <p className="text-sm font-semibold leading-none">{title}</p>

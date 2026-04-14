@@ -27,7 +27,7 @@ export function ManagerLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell
       navItems={navItems}
-      title="StorageOS"
+      title="SpotSlot"
       roleLabel="Facility Manager"
       accentColor="bg-emerald-600"
     >

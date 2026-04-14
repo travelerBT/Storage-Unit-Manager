@@ -69,7 +69,7 @@ export function SubscriptionPage() {
       </div>
 
       <p className="text-muted-foreground text-xs">
-        To upgrade or change your plan, contact support at support@storageos.app
+        To upgrade or change your plan, contact support at support@spotslot.io
       </p>
     </div>
   )

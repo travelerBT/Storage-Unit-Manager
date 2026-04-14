@@ -50,13 +50,27 @@ service cloud.firestore {
         get(/databases/$(database)/documents/facilities/$(facilityId)).data.businessId == claims().businessId;
     }
 
+    // Returns true when the user being read is a tenant/manager of the owner's business.
+    function isUserInBusiness(userId) {
+      return isBusinessOwner() && (
+        (resource.data.businessId == claims().businessId) ||
+        (exists(/databases/$(database)/documents/tenants/$(userId)) &&
+          get(/databases/$(database)/documents/tenants/$(userId)).data.businessId == claims().businessId)
+      );
+    }
+
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isSelf(userId) || isSuperAdmin()
-                  || (isBusinessOwner() && claims().businessId == resource.data.businessId)
+                  || isUserInBusiness(userId)
                   || (isManager() && resource.data.facilityIds.hasAny(claims().facilityIds));
       allow create: if isSelf(userId);
-      allow update: if isSelf(userId) || isSuperAdmin();
+      // Business owners can update users within their business (e.g. assign facilityIds, promote role)
+      allow update: if isSelf(userId) || isSuperAdmin()
+                    || (isBusinessOwner() && (
+                         resource.data.businessId == claims().businessId
+                         || request.resource.data.businessId == claims().businessId
+                       ));
       allow delete: if isSuperAdmin();
     }
 

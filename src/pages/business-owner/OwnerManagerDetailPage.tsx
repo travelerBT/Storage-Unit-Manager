@@ -11,10 +11,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Mail, Phone, Building2, ShieldCheck, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Building2, ShieldCheck, Save, Loader2, Pencil, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateDoc, doc, serverTimestamp, arrayUnion, arrayRemove } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { db, auth } from '@/lib/firebase'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +52,11 @@ export function OwnerManagerDetailPage() {
   const [selectedIds, setSelectedIds]     = useState<string[]>([])
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+
+  // Edit profile dialog state
+  const [editOpen, setEditOpen]   = useState(false)
+  const [editName, setEditName]   = useState('')
+  const [editPhone, setEditPhone] = useState('')
 
   // One-time initialisation when manager data first arrives (avoid useEffect setState warning)
   if (manager && manager.id !== initializedFor) {
@@ -113,6 +122,33 @@ export function OwnerManagerDetailPage() {
       setDirty(false)
     },
     onError: () => toast.error('Failed to save changes'),
+  })
+
+  const editProfileMutation = useMutation({
+    mutationFn: async () => {
+      if (!managerId) return
+      await updateDoc(doc(db, 'users', managerId), {
+        displayName: editName.trim(),
+        phone:       editPhone.trim() || null,
+        updatedAt:   serverTimestamp(),
+      })
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['user', managerId] })
+      void qc.invalidateQueries({ queryKey: ['users-business', appUser?.businessId] })
+      toast.success('Profile updated')
+      setEditOpen(false)
+    },
+    onError: () => toast.error('Failed to update profile'),
+  })
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async () => {
+      if (!manager?.email) return
+      await sendPasswordResetEmail(auth, manager.email)
+    },
+    onSuccess: () => toast.success(`Password reset email sent to ${manager?.email}`),
+    onError: () => toast.error('Failed to send password reset email'),
   })
 
   const promoteToManagerMutation = useMutation({
@@ -190,7 +226,21 @@ export function OwnerManagerDetailPage() {
         {/* Contact info */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Contact</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base">Contact &amp; Profile</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => {
+                  setEditName(manager.displayName ?? '')
+                  setEditPhone(manager.phone ?? '')
+                  setEditOpen(true)
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2.5 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -203,6 +253,18 @@ export function OwnerManagerDetailPage() {
             ) : (
               <p className="text-muted-foreground text-xs">No phone on file</p>
             )}
+            <Separator />
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => resetPasswordMutation.mutate()}
+              disabled={resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending
+                ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Sending…</>
+                : <><KeyRound className="mr-2 h-3.5 w-3.5" />Send Password Reset</>}
+            </Button>
           </CardContent>
         </Card>
 
@@ -286,6 +348,45 @@ export function OwnerManagerDetailPage() {
         </Card>
 
       </div>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Manager name"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input
+                id="edit-phone"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                placeholder="(555) 555-5555"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => editProfileMutation.mutate()}
+              disabled={editProfileMutation.isPending || !editName.trim()}
+            >
+              {editProfileMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

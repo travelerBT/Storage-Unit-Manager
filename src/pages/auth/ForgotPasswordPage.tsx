@@ -41,7 +41,7 @@ export function ForgotPasswordPage() {
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
           <Warehouse className="h-5 w-5" />
         </div>
-        <span className="text-2xl font-bold tracking-tight">StorageOS</span>
+        <span className="text-2xl font-bold tracking-tight">SpotSlot</span>
       </div>
 
       <Card className="w-full max-w-sm shadow-lg">

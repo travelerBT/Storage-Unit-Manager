@@ -19,7 +19,7 @@ export function TenantLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell
       navItems={navItems}
-      title="StorageOS"
+      title="SpotSlot"
       roleLabel="My Account"
       accentColor="bg-amber-600"
     >

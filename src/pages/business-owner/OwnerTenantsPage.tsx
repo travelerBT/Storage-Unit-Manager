@@ -51,12 +51,18 @@ export function OwnerTenantsPage() {
     enabled: !!appUser?.businessId,
   })
 
+  const tenantUserIds = tenants.map((t) => t.userId)
+
   const { data: allUsers = [] } = useQuery({
-    queryKey: ['users-all'],
-    queryFn: () => usersService.listAll(),
+    queryKey: ['users-by-ids', tenantUserIds.join(',')],
+    queryFn: async () => {
+      const results = await Promise.all(tenantUserIds.map((id) => usersService.getById(id)))
+      return results.filter(Boolean) as Awaited<ReturnType<typeof usersService.getById>>[]
+    },
+    enabled: tenantUserIds.length > 0,
   })
 
-  const userMap = Object.fromEntries(allUsers.map((u) => [u.id, u]))
+  const userMap = Object.fromEntries((allUsers.filter(Boolean) as NonNullable<(typeof allUsers)[number]>[]).map((u) => [u.id, u]))
 
   const filtered = tenants.filter((t) => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false
@@ -76,7 +82,7 @@ export function OwnerTenantsPage() {
     setInviting(true)
     try {
       // Check if the user already has an account
-      const existing = allUsers.find((u) => u.email === inviteEmail.trim())
+      const existing = allUsers.filter(Boolean).find((u) => u!.email === inviteEmail.trim())
       if (existing) {
         // Already registered — navigate directly to their tenant detail if a tenant doc exists
         const existingTenant = tenants.find((t) => t.userId === existing.id)

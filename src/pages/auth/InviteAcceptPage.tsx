@@ -94,7 +94,7 @@ export function InviteAcceptPage() {
       }
 
       await refreshClaims()
-      toast.success('Account created! Welcome to StorageOS.')
+      toast.success('Account created! Welcome to SpotSlot.')
     } catch {
       toast.error('Could not create account. Please try again.')
     } finally {
@@ -116,14 +116,14 @@ export function InviteAcceptPage() {
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
           <Warehouse className="h-5 w-5" />
         </div>
-        <span className="text-2xl font-bold tracking-tight">StorageOS</span>
+        <span className="text-2xl font-bold tracking-tight">SpotSlot</span>
       </div>
 
       <Card className="w-full max-w-sm shadow-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl">Accept invitation</CardTitle>
           <CardDescription>
-            You&apos;ve been invited to join StorageOS as <strong>{inviteEmail}</strong>
+            You&apos;ve been invited to join SpotSlot as <strong>{inviteEmail}</strong>
           </CardDescription>
         </CardHeader>
 

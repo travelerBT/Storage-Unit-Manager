@@ -17,7 +17,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell
       navItems={navItems}
-      title="StorageOS"
+      title="SpotSlot"
       roleLabel="Super Admin"
       accentColor="bg-violet-600"
     >
