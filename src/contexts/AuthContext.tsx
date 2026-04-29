@@ -9,8 +9,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   GoogleAuthProvider,
   signOut,
   sendPasswordResetEmail,
@@ -67,8 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const loadedUser = { id: snap.id, ...data } as AppUser
       setAppUser(loadedUser)
 
-      // Resolve all roles (fall back to single role for legacy docs)
-      const userRoles: UserRole[] = data.roles ?? [data.role as UserRole]
+      // Resolve all roles (fall back to single role for legacy docs or empty arrays)
+      const rawRoles: UserRole[] = data.roles ?? []
+      const userRoles: UserRole[] = rawRoles.length > 0 ? rawRoles : [data.role as UserRole]
       setRoles(userRoles)
 
       // Restore persisted active role if still valid, otherwise pick highest
@@ -89,28 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Handle redirect result from Google SSO
-    getRedirectResult(auth).then(async (result) => {
-      if (result?.user) {
-        const userRef = doc(db, 'users', result.user.uid)
-        const snap = await getDoc(userRef)
-        if (!snap.exists()) {
-          const now = serverTimestamp()
-          await setDoc(userRef, {
-            role: 'tenant' as UserRole,
-            roles: ['tenant'] as UserRole[],
-            displayName: result.user.displayName ?? '',
-            email: result.user.email ?? '',
-            createdAt: now,
-            updatedAt: now,
-          })
-        }
-        // Always reload user data after redirect — onAuthStateChanged may have
-        // fired before the Firestore doc existed, leaving role=null
-        await loadUserData(result.user)
-      }
-    }).catch(() => {})
-
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user)
       if (user) {
@@ -131,8 +109,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signInWithGoogle() {
     const provider = new GoogleAuthProvider()
-    await signInWithRedirect(auth, provider)
-    // Page will redirect to Google; result handled in useEffect via getRedirectResult
+    const result = await signInWithPopup(auth, provider)
+    const userRef = doc(db, 'users', result.user.uid)
+    const snap = await getDoc(userRef)
+    if (!snap.exists()) {
+      const now = serverTimestamp()
+      await setDoc(userRef, {
+        role: 'tenant' as UserRole,
+        roles: ['tenant'] as UserRole[],
+        displayName: result.user.displayName ?? '',
+        email: result.user.email ?? '',
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+    await loadUserData(result.user)
   }
 
   async function signUp(email: string, password: string, displayName: string) {

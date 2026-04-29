@@ -31,7 +31,6 @@ export function LoginPage() {
     setGoogleLoading(true)
     try {
       await signInWithGoogle()
-      // Page will redirect to Google — loading stays true until redirect
     } catch {
       toast.error('Google sign-in failed. Please try again.')
       setGoogleLoading(false)
