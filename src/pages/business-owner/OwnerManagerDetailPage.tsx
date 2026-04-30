@@ -194,7 +194,8 @@ export function OwnerManagerDetailPage() {
   }
 
   const initials = manager.displayName?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() ?? '?'
-  const isManager = manager.role === 'manager'
+  const allRoles: string[] = (manager as { roles?: string[] }).roles ?? (manager.role ? [manager.role] : [])
+  const isManager = allRoles.includes('manager')
 
   return (
     <div className="space-y-6">
@@ -210,12 +211,21 @@ export function OwnerManagerDetailPage() {
           </Avatar>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{manager.displayName}</h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              {isManager ? (
-                <Badge variant="outline" className="bg-emerald-100 text-emerald-800 text-xs">Manager</Badge>
-              ) : (
-                <Badge variant="secondary" className="text-xs">{manager.role}</Badge>
-              )}
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {allRoles.map((r) => (
+                <Badge
+                  key={r}
+                  variant="outline"
+                  className={
+                    r === 'manager'       ? 'bg-emerald-100 text-emerald-800 text-xs' :
+                    r === 'business_owner' ? 'bg-blue-100 text-blue-800 text-xs' :
+                    r === 'super_admin'    ? 'bg-purple-100 text-purple-800 text-xs' :
+                    'bg-muted text-muted-foreground text-xs'
+                  }
+                >
+                  {r.replace('_', ' ')}
+                </Badge>
+              ))}
             </div>
           </div>
         </div>

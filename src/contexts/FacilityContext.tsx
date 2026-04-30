@@ -26,7 +26,7 @@ export function FacilityProvider({ children }: { children: ReactNode }) {
   const { data: facilities = [] } = useQuery({
     queryKey: ['manager-facilities', appUser?.id],
     queryFn: () => facilityService.listByManager(appUser!.id),
-    enabled: !!appUser && appUser.role === 'manager',
+    enabled: !!appUser && ((appUser.roles ?? [appUser.role]).includes('manager')),
   })
 
   // Default to first facility when loaded
@@ -49,4 +49,9 @@ export function useFacility() {
   const ctx = useContext(FacilityContext)
   if (!ctx) throw new Error('useFacility must be used inside FacilityProvider')
   return ctx
+}
+
+/** Returns null when used outside FacilityProvider (e.g. in shared layouts). */
+export function useFacilityOptional() {
+  return useContext(FacilityContext)
 }

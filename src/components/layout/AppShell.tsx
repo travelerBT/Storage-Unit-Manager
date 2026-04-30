@@ -14,7 +14,8 @@ import {
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/contexts/AuthContext'
-import { Menu, LogOut, User, ChevronRight, ArrowLeftRight } from 'lucide-react'
+import { useFacilityOptional } from '@/contexts/FacilityContext'
+import { Menu, LogOut, User, ChevronRight, ArrowLeftRight, Building2, ChevronsUpDown } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { roleHomePath } from '@/components/auth/RouteGuards'
 import type { UserRole } from '@/types'
@@ -129,6 +130,42 @@ function SidebarContent({
   )
 }
 
+function FacilitySwitcher() {
+  const facilityCtx = useFacilityOptional()
+  if (!facilityCtx || facilityCtx.facilities.length < 2) return null
+
+  const { facility, facilities, setFacilityId } = facilityCtx
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<div />} nativeButton={false}>
+        <Button variant="outline" size="sm" className="flex items-center gap-1.5 max-w-[200px]">
+          <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate text-sm">{facility?.name ?? 'Select facility'}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground ml-1" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Switch facility</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {facilities.map((f) => (
+          <DropdownMenuItem
+            key={f.id}
+            onClick={() => setFacilityId(f.id)}
+            className={cn(f.id === facility?.id && 'bg-accent font-medium')}
+          >
+            <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
+            <span className="truncate">{f.name}</span>
+            {f.id === facility?.id && (
+              <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function AppShell({ children, navItems, title, roleLabel, accentColor }: AppShellProps) {
   const { appUser, logOut, role, roles, switchRole } = useAuth()
   const navigate = useNavigate()
@@ -183,6 +220,8 @@ export function AppShell({ children, navItems, title, roleLabel, accentColor }: 
           </div>
 
           <div className="ml-auto flex items-center gap-3">
+            {/* Facility switcher — only rendered inside FacilityProvider with 2+ facilities */}
+            <FacilitySwitcher />
             <DropdownMenu>
               <DropdownMenuTrigger render={<div />} nativeButton={false}>
                 <Button variant="ghost" className="flex items-center gap-2 px-2">

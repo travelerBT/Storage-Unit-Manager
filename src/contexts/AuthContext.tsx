@@ -58,24 +58,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userClaims = tokenResult.claims as unknown as CustomClaims
     setClaims(userClaims)
 
-    // Load AppUser from Firestore
+    // Load AppUser from Firestore, creating a default doc for new users
     const userRef = doc(db, 'users', user.uid)
-    const snap = await getDoc(userRef)
-    if (snap.exists()) {
-      const data = snap.data()
-      const loadedUser = { id: snap.id, ...data } as AppUser
-      setAppUser(loadedUser)
-
-      // Resolve all roles (fall back to single role for legacy docs or empty arrays)
-      const rawRoles: UserRole[] = data.roles ?? []
-      const userRoles: UserRole[] = rawRoles.length > 0 ? rawRoles : [data.role as UserRole]
-      setRoles(userRoles)
-
-      // Restore persisted active role if still valid, otherwise pick highest
-      const saved = localStorage.getItem('activeRole') as UserRole | null
-      const active = saved && userRoles.includes(saved) ? saved : highestRole(userRoles)
-      setActiveRole(active)
+    let snap = await getDoc(userRef)
+    if (!snap.exists()) {
+      const now = serverTimestamp()
+      await setDoc(userRef, {
+        role: 'tenant' as UserRole,
+        roles: ['tenant'] as UserRole[],
+        displayName: user.displayName ?? '',
+        email: user.email ?? '',
+        createdAt: now,
+        updatedAt: now,
+      })
+      snap = await getDoc(userRef)
     }
+
+    const data = snap.data()!
+    const loadedUser = { id: snap.id, ...data } as AppUser
+    setAppUser(loadedUser)
+
+    // Resolve all roles (fall back to single role for legacy docs or empty arrays)
+    const rawRoles: UserRole[] = data.roles ?? []
+    const userRoles: UserRole[] = rawRoles.length > 0 ? rawRoles : [data.role as UserRole]
+    setRoles(userRoles)
+
+    // Restore persisted active role if still valid, otherwise pick highest
+    const saved = localStorage.getItem('activeRole') as UserRole | null
+    const active = saved && userRoles.includes(saved) ? saved : highestRole(userRoles)
+    setActiveRole(active)
   }
 
   function switchRole(newRole: UserRole) {
@@ -109,21 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signInWithGoogle() {
     const provider = new GoogleAuthProvider()
-    const result = await signInWithPopup(auth, provider)
-    const userRef = doc(db, 'users', result.user.uid)
-    const snap = await getDoc(userRef)
-    if (!snap.exists()) {
-      const now = serverTimestamp()
-      await setDoc(userRef, {
-        role: 'tenant' as UserRole,
-        roles: ['tenant'] as UserRole[],
-        displayName: result.user.displayName ?? '',
-        email: result.user.email ?? '',
-        createdAt: now,
-        updatedAt: now,
-      })
-    }
-    await loadUserData(result.user)
+    await signInWithPopup(auth, provider)
+    // onAuthStateChanged handles loadUserData (including new-user doc creation)
   }
 
   async function signUp(email: string, password: string, displayName: string) {

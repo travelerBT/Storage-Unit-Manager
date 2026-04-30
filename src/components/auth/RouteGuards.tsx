@@ -8,7 +8,7 @@ interface RequireAuthProps {
 }
 
 export function RequireAuth({ children, allowedRoles }: RequireAuthProps) {
-  const { firebaseUser, roles, loading } = useAuth()
+  const { firebaseUser, role, roles, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -23,8 +23,9 @@ export function RequireAuth({ children, allowedRoles }: RequireAuthProps) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Check if any of the user's roles satisfies the route requirement
-  if (allowedRoles && !allowedRoles.some((r) => roles.includes(r))) {
+  // Use all assigned roles; fall back to active role if roles array is still empty
+  const effectiveRoles = roles.length > 0 ? roles : (role ? [role] : [])
+  if (allowedRoles && !allowedRoles.some((r) => effectiveRoles.includes(r))) {
     return <Navigate to="/unauthorized" replace />
   }
 

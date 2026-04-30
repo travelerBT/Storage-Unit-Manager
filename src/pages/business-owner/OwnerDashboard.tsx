@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
-import { facilityService } from '@/lib/services'
+import { facilityService, unitService } from '@/lib/services'
 import { callFunction } from '@/lib/firebase'
 import { StatCard } from '@/components/shared/StatCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -104,11 +104,29 @@ export function OwnerDashboard() {
     enabled: !!appUser?.businessId,
   })
 
+  // Derive live unit counts per facility (denormalized fields on facility docs go stale)
+  const { data: unitCounts = {} } = useQuery({
+    queryKey: ['dashboard-unit-counts', facilities.map((f) => f.id)],
+    queryFn: async () => {
+      const results = await Promise.all(
+        facilities.map((f) =>
+          unitService.listByFacility(f.id).then((units) => ({
+            facilityId: f.id,
+            total:    units.length,
+            occupied: units.filter((u) => u.status === 'occupied').length,
+          }))
+        )
+      )
+      return Object.fromEntries(results.map((r) => [r.facilityId, r]))
+    },
+    enabled: facilities.length > 0,
+  })
+
   // Show setup screen if businessId isn't linked yet
   if (!appUser?.businessId) return <BusinessSetup />
 
-  const totalUnits    = facilities.reduce((s, f) => s + f.totalUnits, 0)
-  const totalOccupied = facilities.reduce((s, f) => s + f.occupiedUnits, 0)
+  const totalUnits    = facilities.reduce((s, f) => s + (unitCounts[f.id]?.total    ?? f.totalUnits),    0)
+  const totalOccupied = facilities.reduce((s, f) => s + (unitCounts[f.id]?.occupied ?? f.occupiedUnits), 0)
   const occupancyRate = totalUnits > 0 ? Math.round((totalOccupied / totalUnits) * 100) : 0
 
   return (
@@ -137,12 +155,14 @@ export function OwnerDashboard() {
             </div>
           )}
           {facilities.map((f) => {
-            const rate = f.totalUnits > 0 ? Math.round((f.occupiedUnits / f.totalUnits) * 100) : 0
+            const liveTotal    = unitCounts[f.id]?.total    ?? f.totalUnits
+            const liveOccupied = unitCounts[f.id]?.occupied ?? f.occupiedUnits
+            const rate = liveTotal > 0 ? Math.round((liveOccupied / liveTotal) * 100) : 0
             return (
               <div key={f.id} className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <p className="font-medium">{f.name}</p>
-                  <p className="text-muted-foreground text-xs">{f.city}, {f.state} · {f.occupiedUnits}/{f.totalUnits} units · {rate}% occupied</p>
+                  <p className="text-muted-foreground text-xs">{f.city}, {f.state} · {liveOccupied}/{liveTotal} units · {rate}% occupied</p>
                 </div>
                 <StatusBadge status={f.subscriptionStatus} />
               </div>
